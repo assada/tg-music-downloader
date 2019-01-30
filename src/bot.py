@@ -31,7 +31,8 @@ class Config:
         self.token = token
 
     def validate(self):
-        if len(self.token) == 45 and (isinstance(self.admin, str) or isinstance(self.admin, unicode)) and os.path.exists(self.destination):
+        if len(self.token) == 45 and (
+                isinstance(self.admin, str) or isinstance(self.admin, unicode)) and os.path.exists(self.destination):
             return True
         return False
 
@@ -39,7 +40,6 @@ class Config:
 if len(sys.argv) < 3:
     logger.error('Please, provide all arguments!')
     exit()
-
 
 config = Config(sys.argv[3], sys.argv[2], sys.argv[1])
 
@@ -64,9 +64,11 @@ def error(bot, update, error):
 
 def youtube(bot, update):
     text = str(update.message.text.encode('utf-8'))
-    regex = r"^((?:https?:)?\/\/)?((?:www|m)\.)?((?:youtube\.com|youtu.be))(\/(?:[\w\-]+\?v=|embed\/|v\/)?)([\w\-]+)(\S+)?$"
-    pattern = re.compile(regex)
-    if pattern.match(text):
+    regexYoutube = r"^((?:https?:)?\/\/)?((?:www|m)\.)?((?:youtube\.com|youtu.be))(\/(?:[\w\-]+\?v=|embed\/|v\/)?)([\w\-]+)(\S+)?$"
+    regexSoundCloud = r"^http(s?):\/\/soundcloud.com\/(.*)\/[a-zA-Z-0-9]+$"
+    patternYoutube = re.compile(regexYoutube)
+    patternSoundcloud = re.compile(regexSoundCloud)
+    if patternYoutube.match(text) or patternSoundcloud.match(text):
         download_youtube(bot, update, text)
 
 
@@ -97,44 +99,43 @@ def download_tg(bot, message, file_id):
 
 @run_async
 def download_youtube(bot, update, link):
-    try:
-        fileName = formatting(link)
-        ydl_opts = {
-            'outtmpl': config.destination + fileName + '.(ext)s',
-            'format': 'bestaudio/best',
-            'postprocessors': [{
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'mp3',
-                'preferredquality': '320',
-            }],
-        }
-        message = update.message.reply_text('Start downloading...', quote=True)
-        with youtube_dl.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(link, download=True)
-            title = info['title']
-            message.edit_text(text='Downloading...')
-        logger.info(title)
-        fullTitle = title
-        data = title.split(' - ', 1)
-        path = config.destination + fileName + '.mp3'
-        if len(data) >= 2:
-            title = data[1]
-            message.edit_text(text='Processing...')
-            audio = EasyID3(path)
-            audio["artist"] = data[0]
-            audio["title"] = data[1]
-            audio.save()
-        message.edit_text(text='Sending...')
-        if os.path.exists(path):
+    fileName = formatting(link)
+    ydl_opts = {
+        'outtmpl': config.destination + fileName + '.(ext)s',
+        'format': 'bestaudio/best',
+        'postprocessors': [{
+            'key': 'FFmpegExtractAudio',
+            'preferredcodec': 'mp3',
+            'preferredquality': '320',
+        }],
+    }
+    message = update.message.reply_text('Start downloading...', quote=True)
+    with youtube_dl.YoutubeDL(ydl_opts) as ydl:
+        message.edit_text(text='Downloading...')
+        info = ydl.extract_info(link, download=True)
+        title = info['title']
+    fullTitle = title
+    data = title.split(' - ', 1)
+    path = config.destination + fileName + '.mp3'
+    if len(data) >= 2:
+        title = data[1]
+        message.edit_text(text='Processing...')
+        audio = EasyID3(path)
+        audio["artist"] = data[0]
+        audio["title"] = data[1]
+        audio.save()
+    if os.path.exists(path):
+        fileSize = os.path.getsize(path) / (1024 * 1024) > 50
+        message.edit_text(text="Sending (%sMB)" % fileSize)
+        if not fileSize:
             bot.sendAudio(chat_id=update.message.chat_id, audio=open(path, 'rb'), title=title)
-            message.edit_text(text='Renaming...')
-            shutil.move(path, config.destination + fullTitle + '.mp3')
-            message.edit_text(text='Done!')
         else:
-            message.edit_text(text='Error renaming.')
-    except Exception, e:
-        logger.error(e)
-        message.edit_text(text='Error.')
+            message.edit_text('File is too big for sending to telegram. But i will try save in storage...')
+        message.edit_text(text='Renaming...')
+        shutil.move(path, config.destination + fullTitle + '.mp3')
+        message.edit_text(text='Done!')
+    else:
+        message.edit_text(text='Error downloading.')
 
 
 def main():
