@@ -6,8 +6,12 @@ import os
 import shutil
 import re
 import sys
+
+import requests
 from mutagen.easyid3 import EasyID3
 from threading import Thread
+
+from mutagen.id3 import ID3, TPE1, TIT2, TRCK, TALB, APIC
 from slugify import slugify
 import youtube_dl
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, run_async
@@ -61,6 +65,7 @@ def error(bot, update, error):
     logger.warning('Update "%s" caused error "%s"', update, error)
 
 
+@run_async
 def youtube(bot, update):
     text = str(update.message.text.encode('utf-8'))
     regexYoutube = r"^((?:https?:)?\/\/)?((?:www|m)\.)?((?:youtube\.com|youtu.be))(\/(?:[\w\-]+\?v=|embed\/|v\/)?)([\w\-]+)(\S+)?$"
@@ -86,7 +91,8 @@ def formatting(title):
 
 
 @run_async
-def download_tg(bot, message, file_id):
+def download_tg(bot, update, file_id):
+    message = update.message.reply_text('Start downloading...', quote=True)
     logger.info('Processing file: %s', file_id)
     newFile = bot.get_file(file_id)
     message.edit_text(text='Processing...')
@@ -94,6 +100,31 @@ def download_tg(bot, message, file_id):
     message.edit_text(text='Moving...')
     shutil.move('./temp/' + file_id, config.destination + '/' + file_id + '.mp3')
     message.edit_text(text='Done!')
+
+
+def addMetaData(mp3, url, title, artist, track):
+    urlName = formatting(url)
+    response = requests.get(url, stream=True)
+    with open(urlName, 'wb') as out_file:
+        shutil.copyfileobj(response.raw, out_file)
+    del response
+
+    audio = ID3(mp3)
+    audio['TPE1'] = TPE1(encoding=3, text=artist)
+    audio['TIT2'] = TALB(encoding=3, text=title)
+    audio['TRCK'] = TRCK(encoding=3, text=track)
+
+    with open(urlName, 'rb') as albumart:
+        audio['APIC'] = APIC(
+                          encoding=3,
+                          mime='image/jpeg',
+                          type=3, desc=u'Cover',
+                          data=albumart.read()
+                        )
+    audio.save()
+    cover = open(urlName, 'rb')
+    del urlName
+    return cover
 
 
 @run_async
@@ -109,25 +140,24 @@ def download_youtube(bot, update, link):
         }],
     }
     message = update.message.reply_text('Start downloading...', quote=True)
+    path = config.destination + fileName + '.mp3'
     with youtube_dl.YoutubeDL(ydl_opts) as ydl:
         message.edit_text(text='Downloading...')
-        info = ydl.extract_info(link, download=True)
+        info = ydl.extract_info(link, download=not os.path.exists(path))
         title = info['title']
     fullTitle = title
     data = title.split(' - ', 1)
-    path = config.destination + fileName + '.mp3'
+    performer = 'Unknown Artist'
     if len(data) >= 2:
+        performer = data[0]
         title = data[1]
-        message.edit_text(text='Processing...')
-        audio = EasyID3(path)
-        audio["artist"] = data[0]
-        audio["title"] = data[1]
-        audio.save()
     if os.path.exists(path):
-        fileSize = os.path.getsize(path) / (1024 * 1024) > 50
+        message.edit_text(text='Processing...')
+        cover = addMetaData(path, info['thumbnail'], title, performer, title)
+        fileSize = os.path.getsize(path) / (1024 * 1024)
         message.edit_text(text="Sending (%sMB)" % fileSize)
-        if not fileSize:
-            bot.sendAudio(chat_id=update.message.chat_id, audio=open(path, 'rb'), title=title)
+        if not fileSize > 50:
+            bot.sendAudio(chat_id=update.message.chat_id, audio=open(path, 'rb'), title=title, performer=performer, thumb=cover)
         else:
             message.edit_text('File is too big for sending to telegram. But i will try save in storage...')
         message.edit_text(text='Renaming...')
