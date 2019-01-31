@@ -95,10 +95,8 @@ def download_tg(bot, update, file_id):
     message = update.message.reply_text('Start downloading...', quote=True)
     logger.info('Processing file: %s', file_id)
     newFile = bot.get_file(file_id)
-    message.edit_text(text='Processing...')
-    newFile.download('./temp/' + file_id)
-    message.edit_text(text='Moving...')
-    shutil.move('./temp/' + file_id, config.destination + '/' + file_id + '.mp3')
+    message.edit_text(text='Downloading...')
+    newFile.download(config.destination + '/' + file_id + '.mp3')
     message.edit_text(text='Done!')
 
 
