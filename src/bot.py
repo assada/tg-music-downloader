@@ -53,9 +53,8 @@ def help(bot, update):
 
 
 def audio(bot, update):
-    message = update.message.reply_text('Start downloading...', quote=True)
     file_id = update.message.audio.file_id
-    download_tg(bot, update, file_id, message)
+    download_tg(bot, update, file_id)
 
 
 def error(bot, update, error):
