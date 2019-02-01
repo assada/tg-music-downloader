@@ -1,10 +1,13 @@
 from __future__ import unicode_literals
+
 import os
 
 
 class Config:
     def __init__(self, logger, destination, admin, token):
-        self.destination = destination + '/'
+        self.destination = destination
+        if not self.destination.endswith('/'):
+            self.destination = destination + '/'
         if not os.path.exists(destination):
             logger.info('Creating destination path...')
             os.makedirs(destination)
@@ -19,5 +22,5 @@ class Config:
             return True
         return False
 
-    def getLogger(self):
+    def get_logger(self):
         return self.logger
