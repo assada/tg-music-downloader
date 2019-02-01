@@ -37,7 +37,7 @@ build: ## Build or rebuild service image
 
 .PHONY: run
 run: ## Run bot
-	python2 src/bot.py $(ARGS)
+	python2 bot.py $(ARGS)
 
 .PHONY: help
 help: .title ## Show this help and exit (default target)
