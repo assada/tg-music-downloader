@@ -12,6 +12,7 @@ from threading import Thread
 from telegram import ChatAction
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, run_async
 
+from src.helper import Helper
 from src.config import Config
 from src.downloader import Downloader
 
@@ -21,15 +22,11 @@ sys.setdefaultencoding('utf8')
 logging.basicConfig(format='[%(levelname)s] (%(name)s) %(message)s', level=os.getenv('LOG_LEVEL', logging.INFO))
 logger = logging.getLogger(__name__)
 
-if len(sys.argv) < 3:
-    logger.error('Please, provide all arguments!')
-    exit()
-
 config = Config(
     logger,
-    os.getenv('BOT_TOKEN', sys.argv[3]),
-    os.getenv('BOT_ADMIN', sys.argv[2]),
-    os.getenv('BOT_DESTINATION', sys.argv[1]),
+    os.getenv('BOT_TOKEN', Helper.list_get(sys.argv, 3, None)),
+    os.getenv('BOT_ADMIN', Helper.list_get(sys.argv, 2, None)),
+    os.getenv('BOT_DESTINATION', Helper.list_get(sys.argv, 1, None)),
     os.getenv('BOT_PERSISTENCE', True),
 )
 downloader = Downloader(config)

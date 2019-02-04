@@ -1,1 +1,1 @@
-__all__ = ['config', 'downloader']
+__all__ = ['config', 'downloader', 'helper']

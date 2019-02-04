@@ -16,6 +16,16 @@ make build
 make run "<token>" "<admin_username>" "<destination_path>"
 ```
 
+or using docker:
+1) Build container:
+```bash
+docker build -t tg-bot:latest .
+```
+2) Run container:
+```bash
+docker run --rm -v $(pwd)/files:/tg-music-downloader/files -e BOT_TOKEN='<tg_bot_token>' -e BOT_ADMIN='<tg_username>' -e BOT_DESTINATION='./files' tg-bot
+```
+
 ### License
 
 The OctoberCMS platform is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
