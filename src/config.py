@@ -4,7 +4,7 @@ import os
 
 
 class Config:
-    def __init__(self, logger, destination, admin, token):
+    def __init__(self, logger, destination, admin, token, persist):
         self.destination = destination
         if not self.destination.endswith('/'):
             self.destination = destination + '/'
@@ -14,7 +14,8 @@ class Config:
             logger.info('Created!')
         self.admin = '@' + admin
         self.token = token
-        self.logger = logger
+        self._logger = logger
+        self.persist = persist
 
     def validate(self):
         if len(self.token) == 45 and (
@@ -23,4 +24,4 @@ class Config:
         return False
 
     def get_logger(self):
-        return self.logger
+        return self._logger
