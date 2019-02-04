@@ -24,9 +24,9 @@ logger = logging.getLogger(__name__)
 
 config = Config(
     logger,
-    os.getenv('BOT_TOKEN', Helper.list_get(sys.argv, 3, None)),
+    os.getenv('BOT_TOKEN', Helper.list_get(sys.argv, 1, None)),
     os.getenv('BOT_ADMIN', Helper.list_get(sys.argv, 2, None)),
-    os.getenv('BOT_DESTINATION', Helper.list_get(sys.argv, 1, None)),
+    os.getenv('BOT_DESTINATION', Helper.list_get(sys.argv, 3, None)),
     os.getenv('BOT_PERSISTENCE', True),
 )
 downloader = Downloader(config)
