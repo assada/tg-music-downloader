@@ -4,7 +4,7 @@ import os
 
 
 class Config:
-    def __init__(self, logger, token, admin, destination, persist):
+    def __init__(self, logger, token, admin, destination, persist, quality):
         self.destination = destination
         if not self.destination.endswith('/'):
             self.destination = destination + '/'
@@ -12,6 +12,7 @@ class Config:
         self.token = token
         self._logger = logger
         self.persist = persist
+        self.quality = quality
         self._create_path(self.destination)
 
     def _create_path(self, destination):

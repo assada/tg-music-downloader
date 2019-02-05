@@ -27,7 +27,8 @@ config = Config(
     os.getenv('BOT_TOKEN', Helper.list_get(sys.argv, 1, None)),
     os.getenv('BOT_ADMIN', Helper.list_get(sys.argv, 2, None)),
     os.getenv('BOT_DESTINATION', Helper.list_get(sys.argv, 3, None)),
-    os.getenv('BOT_PERSISTENCE', True),
+    os.getenv('BOT_PERSISTENCE', Helper.list_get(sys.argv, 4, True)),
+    os.getenv('BOT_QUALITY', Helper.list_get(sys.argv, 5, '320')),
 )
 downloader = Downloader(config)
 
@@ -81,7 +82,7 @@ def create_playlist(bot, update):
             _m3u = open(os.path.split(path)[1] + "playlist.m3u", "w")
             for song in glob.glob("*.mp3"):
                 try:
-                    _m3u.write(config.destination + song.encode("utf-8") + "\n")
+                    _m3u.write(os.path.abspath(song.encode("utf-8")) + "\n")
                 except:
                     logger.error('Error adding file: %s', song)
             _m3u.close()
