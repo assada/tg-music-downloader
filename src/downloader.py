@@ -143,10 +143,13 @@ class Downloader:
         new_file = bot.get_file(file_id)
         message.edit_text(text='🧠 Downloading...')
         path = (self.config.destination + file_id + '.mp3').encode("utf-8")
+        self.config.get_logger().info('Downloading to: %s...', path)
         if new_file.download(path):
+            self.config.get_logger().info('Downloaded %s', path)
             fullname = self.get_fullname_by_tags(path)
             if fullname:
                 new_path = '%s%s.mp3' % (self.config.destination, fullname.encode("utf-8"))
+                self.config.get_logger().info('Renaming %s to %s', path, new_path)
                 os.rename(path, new_path)
                 self.config.get_logger().info('Renamed %s...', new_path)
                 path = new_path

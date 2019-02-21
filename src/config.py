@@ -1,5 +1,5 @@
 from __future__ import unicode_literals
-from mpd import MPDClient
+from mpd import MPDClient, ConnectionError
 
 import os
 
@@ -16,14 +16,31 @@ class Config:
         self._logger = logger
         self.persist = persist
         self.quality = quality
-        self.client = None
-        if mpd_host is not False and mpd_port is not False:
+        self._client = None
+        self.mpd_host = mpd_host
+        self.mpd_port = mpd_port
+        self._connect_retries = 0
+        self._create_path(self.destination)
+        self.client()
+
+    def client(self):
+        if self._client is None and self.mpd_host is not False and self.mpd_port is not False:
             client = MPDClient()
             client.timeout = 20
             client.idletimeout = None
-            client.connect(mpd_host, mpd_port)
-            self.client = client
-        self._create_path(self.destination)
+            client.connect(self.mpd_host, self.mpd_port)
+            self._client = client
+            self._connect_retries = 0
+        if self._client is not None:
+            try:
+                self._client.ping()
+            except ConnectionError:
+                self._client = None
+                if self._connect_retries <= 3:
+                    self.get_logger().warning('Reconnecting to MPD...')
+                    return self.client()
+
+        return self._client
 
     def _create_path(self, destination):
             if not os.path.exists(destination):

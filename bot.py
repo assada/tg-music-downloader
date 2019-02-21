@@ -37,6 +37,16 @@ downloader = Downloader(config)
 
 updates = {}
 
+button_list = [
+            telegram.InlineKeyboardButton("▶ Play", callback_data='mpd_play'),
+            telegram.InlineKeyboardButton("⏸ Pause", callback_data='mpd_pause'),
+            telegram.InlineKeyboardButton("🗃 All Playlists", callback_data='mpd_lists'),
+            telegram.InlineKeyboardButton("🔊 Up +5", callback_data='mpd_up'),
+            telegram.InlineKeyboardButton("🔇 Mute", callback_data='mpd_mute'),
+            telegram.InlineKeyboardButton("🔉 Down -5", callback_data='mpd_down')
+        ]
+reply_markup = telegram.InlineKeyboardMarkup(Helper.build_menu(button_list, n_cols=3))
+
 
 @run_async
 def link(bot, update):
@@ -78,57 +88,60 @@ def error(bot, update, e):
     logger.warning('Update "%s" caused error "%s"', update, e)
 
 
-def button(bot, update, update_queue):
+def button(bot, update):
     query = update.callback_query
     data = query.data
     if data is not "cancel":
         if data.startswith('http'):
+            bot.answerCallbackQuery(query.id, text='⏳')
             downloader.download_by_link(bot, updates[data], data)
         elif 'mpd_mute' in data:
-            if config.client is not None:
-                config.client.setvol(0)
+            if config.client() is not None:
+                config.client().setvol(0)
+                bot.answerCallbackQuery(query.id, text='🔇 Mute')
         elif 'mpd_up' in data:
-            if config.client is not None:
-                c_vol = config.client.status()['volume']
+            if config.client() is not None:
+                c_vol = config.client().status()['volume']
                 if int(c_vol) <= 100:
-                    config.client.setvol(int(c_vol)+5)
+                    config.client().setvol(int(c_vol)+5)
+                    bot.answerCallbackQuery(query.id, text='🔊 +5')
         elif 'mpd_down' in data:
-            if config.client is not None:
-                c_vol = config.client.status()['volume']
+            if config.client() is not None:
+                c_vol = config.client().status()['volume']
                 if int(c_vol) != 0:
-                    config.client.setvol(int(c_vol)-5)
+                    config.client().setvol(int(c_vol)-5)
+                    bot.answerCallbackQuery(query.id, text='🔉 -5')
         elif 'mpd_play' in data:
-            if config.client is not None:
-                config.client.play()
+            if config.client() is not None:
+                config.client().play()
+                bot.answerCallbackQuery(query.id, text='▶ Play')
         elif 'mpd_pause' in data:
-            if config.client is not None:
-                config.client.pause()
+            if config.client() is not None:
+                config.client().pause()
+                bot.answerCallbackQuery(query.id, text='⏸ Pause')
+        elif 'mpd_lists' in data:
+            if config.client() is not None:
+                playlists(bot, query)
+                bot.answerCallbackQuery(query.id, text='🥳')
         elif 'mpd_list:' in data:
             playlist = data.split(':', 1)[1]
-            logger.info(playlist)
-            config.client.clear()
-            config.client.load(playlist)
-            config.client.play()
+            config.client().clear()
+            config.client().load(playlist)
+            config.client().play()
+            bot.answerCallbackQuery(query.id, text='Playing %s' % playlist)
 
         if 'mpd_up' in data or 'mpd_down' in data or 'mpd_mute' in data or 'mpd_play' in data or 'mpd_pause' in data:
-            if config.client is not None:
-                stat = config.client.status()
-                song = config.client.currentsong()
-                button_list = [
-                    telegram.InlineKeyboardButton("Play", callback_data='mpd_play'),
-                    telegram.InlineKeyboardButton("Mute", callback_data='mpd_mute'),
-                    telegram.InlineKeyboardButton("Pause", callback_data='mpd_pause'),
-                    telegram.InlineKeyboardButton("Up +5", callback_data='mpd_up'),
-                    telegram.InlineKeyboardButton("Down -5", callback_data='mpd_down')
-                ]
+            if config.client() is not None:
+                stat = config.client().status()
+                song = config.client().currentsong()
                 if 'title' in song:
                     song = song['title']
                 else:
-                    song = ''
+                    song = '-'
                 query.message.edit_text(
-                    text='*Status:* %s\n*Volume:* %s\n*Song:* %s\n*Playlist:* /playlists' % (stat['state'], stat['volume'], song),
+                    text='*Status:* %s\n*Volume:* %s\n*Song:* %s' % (stat['state'].capitalize(), stat['volume'], song),
                     parse_mode='Markdown',
-                    reply_markup=telegram.InlineKeyboardMarkup(Helper.build_menu(button_list, n_cols=3))
+                    reply_markup=reply_markup
                 )
     else:
         query.message.delete()
@@ -153,38 +166,34 @@ def create_playlist(bot, update):
     message.edit_text(text='Finish.')
 
 
+@run_async
 def playlists(bot, update):
-    if config.client is not None:
-        stat = config.client.status()
-        plays = config.client.listplaylists()
-        button_list = []
+    bot.sendChatAction(chat_id=update.message.chat_id, action=ChatAction.TYPING)
+    if config.client() is not None:
+        plays = config.client().listplaylists()
+        buttons = []
         for playlist in plays:
-            button_list.append(telegram.InlineKeyboardButton(playlist['playlist'], callback_data='mpd_list:%s' % playlist['playlist'])),
+            buttons.append(
+                telegram.InlineKeyboardButton('🎵 %s' % playlist['playlist'], callback_data='mpd_list:%s' % playlist['playlist'])
+            ),
         update.message.reply_text(
-            text='*Select playlist:*',
-            parse_mode='Markdown',
-            reply_markup=telegram.InlineKeyboardMarkup(Helper.build_menu(button_list, n_cols=2))
+            text='Choose playlist:',
+            reply_markup=telegram.InlineKeyboardMarkup(Helper.build_menu(buttons, n_cols=2))
         )
 
 
+@run_async
 def control(bot, update):
-    if config.client is not None:
-        stat = config.client.status()
-        song = config.client.currentsong()
-        button_list = [
-            telegram.InlineKeyboardButton("Play", callback_data='mpd_play'),
-            telegram.InlineKeyboardButton("Mute", callback_data='mpd_mute'),
-            telegram.InlineKeyboardButton("Pause", callback_data='mpd_pause'),
-            telegram.InlineKeyboardButton("Up +5", callback_data='mpd_up'),
-            telegram.InlineKeyboardButton("Down -5", callback_data='mpd_down')
-        ]
-        reply_markup = telegram.InlineKeyboardMarkup(Helper.build_menu(button_list, n_cols=3))
+    bot.sendChatAction(chat_id=update.message.chat_id, action=ChatAction.TYPING)
+    if config.client() is not None:
+        stat = config.client().status()
+        song = config.client().currentsong()
         if 'title' in song:
             song = song['title']
         else:
-            song = ''
+            song = '-'
         update.message.reply_text(
-            text='*Status:* %s\n*Volume:* %s\n*Song:* %s\n*Playlist:* /playlists' % (stat['state'], stat['volume'], song),
+            text='*Status:* %s\n*Volume:* %s\n*Song:* %s' % (stat['state'].capitalize(), stat['volume'], song),
             parse_mode='Markdown',
             reply_markup=reply_markup
         )
@@ -204,10 +213,9 @@ def main():
         Thread(target=stop_and_restart).start()
 
     dp.add_handler(CommandHandler("control", control, filters=Filters.user(username=config.admin)))
-    dp.add_handler(CommandHandler("playlists", playlists, filters=Filters.user(username=config.admin)))
     dp.add_handler(CommandHandler("start", start, filters=Filters.user(username=config.admin)))
     dp.add_handler(CommandHandler("help", help, filters=Filters.user(username=config.admin)))
-    dp.add_handler(CallbackQueryHandler(button, True))
+    dp.add_handler(CallbackQueryHandler(button))
     dp.add_handler(CommandHandler("playlist", create_playlist, filters=Filters.user(username=config.admin)))
     dp.add_handler(CommandHandler('r', restart, filters=Filters.user(username=config.admin)))
     dp.add_handler(MessageHandler(Filters.text & Filters.user(username=config.admin), link))
