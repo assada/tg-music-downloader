@@ -1,10 +1,11 @@
 from __future__ import unicode_literals
+from mpd import MPDClient
 
 import os
 
 
 class Config:
-    def __init__(self, logger, token, admin, destination, persist, quality):
+    def __init__(self, logger, token, admin, destination, persist, quality, mpd_host=False, mpd_port=False):
         self.destination = destination
         if not self.destination.endswith('/'):
             self.destination = destination + '/'
@@ -15,6 +16,13 @@ class Config:
         self._logger = logger
         self.persist = persist
         self.quality = quality
+        self.client = None
+        if mpd_host is not False and mpd_port is not False:
+            client = MPDClient()
+            client.timeout = 20
+            client.idletimeout = None
+            client.connect(mpd_host, mpd_port)
+            self.client = client
         self._create_path(self.destination)
 
     def _create_path(self, destination):

@@ -4,3 +4,4 @@ python-slugify==2.0.1
 mutagen==1.42.0
 requests==2.21.0
 Pillow===5.4.1
+python-mpd2===1.0.0

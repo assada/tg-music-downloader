@@ -165,12 +165,13 @@ class Downloader:
             message.delete()
             button_list = [
                 telegram.InlineKeyboardButton("Download", callback_data=link),
-                telegram.InlineKeyboardButton("Cancel", callback_data='no')
+                telegram.InlineKeyboardButton("Cancel", callback_data='cancel')
             ]
             reply_markup = telegram.InlineKeyboardMarkup(Helper.build_menu(button_list, n_cols=2))
             update.message.reply_text(
                 text='🚥 Download %s?' % info['title'],
-                reply_markup=reply_markup
+                reply_markup=reply_markup,
+                quote=True
             )
 
     @run_async

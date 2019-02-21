@@ -28,8 +28,10 @@ config = Config(
     os.getenv('BOT_TOKEN', Helper.list_get(sys.argv, 1, None)),
     os.getenv('BOT_ADMIN', Helper.list_get(sys.argv, 2, None)),
     os.getenv('BOT_DESTINATION', Helper.list_get(sys.argv, 3, None)),
-    os.getenv('BOT_PERSISTENCE', Helper.list_get(sys.argv, 4, True)),
-    os.getenv('BOT_QUALITY', Helper.list_get(sys.argv, 5, '320')),
+    os.getenv('BOT_PERSISTENCE', Helper.list_get(sys.argv, 6, True)),
+    os.getenv('BOT_QUALITY', Helper.list_get(sys.argv, 7, '320')),
+    mpd_host=os.getenv('BOT_MPD_HOST', Helper.list_get(sys.argv, 4, False)),
+    mpd_port=os.getenv('BOT_MPD_PORT', Helper.list_get(sys.argv, 5, False))
 )
 downloader = Downloader(config)
 
@@ -79,9 +81,57 @@ def error(bot, update, e):
 def button(bot, update, update_queue):
     query = update.callback_query
     data = query.data
-    if data is not "no" and data.startswith('http'):
-        downloader.download_by_link(bot, updates[data], data)
-    query.message.delete()
+    if data is not "cancel":
+        if data.startswith('http'):
+            downloader.download_by_link(bot, updates[data], data)
+        elif 'mpd_mute' in data:
+            if config.client is not None:
+                config.client.setvol(0)
+        elif 'mpd_up' in data:
+            if config.client is not None:
+                c_vol = config.client.status()['volume']
+                if int(c_vol) <= 100:
+                    config.client.setvol(int(c_vol)+5)
+        elif 'mpd_down' in data:
+            if config.client is not None:
+                c_vol = config.client.status()['volume']
+                if int(c_vol) != 0:
+                    config.client.setvol(int(c_vol)-5)
+        elif 'mpd_play' in data:
+            if config.client is not None:
+                config.client.play()
+        elif 'mpd_pause' in data:
+            if config.client is not None:
+                config.client.pause()
+        elif 'mpd_list:' in data:
+            playlist = data.split(':', 1)[1]
+            logger.info(playlist)
+            config.client.clear()
+            config.client.load(playlist)
+            config.client.play()
+
+        if 'mpd_up' in data or 'mpd_down' in data or 'mpd_mute' in data or 'mpd_play' in data or 'mpd_pause' in data:
+            if config.client is not None:
+                stat = config.client.status()
+                song = config.client.currentsong()
+                button_list = [
+                    telegram.InlineKeyboardButton("Play", callback_data='mpd_play'),
+                    telegram.InlineKeyboardButton("Mute", callback_data='mpd_mute'),
+                    telegram.InlineKeyboardButton("Pause", callback_data='mpd_pause'),
+                    telegram.InlineKeyboardButton("Up +5", callback_data='mpd_up'),
+                    telegram.InlineKeyboardButton("Down -5", callback_data='mpd_down')
+                ]
+                if 'title' in song:
+                    song = song['title']
+                else:
+                    song = ''
+                query.message.edit_text(
+                    text='*Status:* %s\n*Volume:* %s\n*Song:* %s\n*Playlist:* /playlists' % (stat['state'], stat['volume'], song),
+                    parse_mode='Markdown',
+                    reply_markup=telegram.InlineKeyboardMarkup(Helper.build_menu(button_list, n_cols=3))
+                )
+    else:
+        query.message.delete()
     if data in updates:
         del updates[data]
 
@@ -103,6 +153,43 @@ def create_playlist(bot, update):
     message.edit_text(text='Finish.')
 
 
+def playlists(bot, update):
+    if config.client is not None:
+        stat = config.client.status()
+        plays = config.client.listplaylists()
+        button_list = []
+        for playlist in plays:
+            button_list.append(telegram.InlineKeyboardButton(playlist['playlist'], callback_data='mpd_list:%s' % playlist['playlist'])),
+        update.message.reply_text(
+            text='*Select playlist:*',
+            parse_mode='Markdown',
+            reply_markup=telegram.InlineKeyboardMarkup(Helper.build_menu(button_list, n_cols=2))
+        )
+
+
+def control(bot, update):
+    if config.client is not None:
+        stat = config.client.status()
+        song = config.client.currentsong()
+        button_list = [
+            telegram.InlineKeyboardButton("Play", callback_data='mpd_play'),
+            telegram.InlineKeyboardButton("Mute", callback_data='mpd_mute'),
+            telegram.InlineKeyboardButton("Pause", callback_data='mpd_pause'),
+            telegram.InlineKeyboardButton("Up +5", callback_data='mpd_up'),
+            telegram.InlineKeyboardButton("Down -5", callback_data='mpd_down')
+        ]
+        reply_markup = telegram.InlineKeyboardMarkup(Helper.build_menu(button_list, n_cols=3))
+        if 'title' in song:
+            song = song['title']
+        else:
+            song = ''
+        update.message.reply_text(
+            text='*Status:* %s\n*Volume:* %s\n*Song:* %s\n*Playlist:* /playlists' % (stat['state'], stat['volume'], song),
+            parse_mode='Markdown',
+            reply_markup=reply_markup
+        )
+
+
 def main():
     updater = Updater(config.token)
     dp = updater.dispatcher
@@ -116,8 +203,10 @@ def main():
         bot.sendChatAction(chat_id=update.message.chat_id, action=ChatAction.TYPING)
         Thread(target=stop_and_restart).start()
 
-    dp.add_handler(CommandHandler("start", start))
-    dp.add_handler(CommandHandler("help", help))
+    dp.add_handler(CommandHandler("control", control, filters=Filters.user(username=config.admin)))
+    dp.add_handler(CommandHandler("playlists", playlists, filters=Filters.user(username=config.admin)))
+    dp.add_handler(CommandHandler("start", start, filters=Filters.user(username=config.admin)))
+    dp.add_handler(CommandHandler("help", help, filters=Filters.user(username=config.admin)))
     dp.add_handler(CallbackQueryHandler(button, True))
     dp.add_handler(CommandHandler("playlist", create_playlist, filters=Filters.user(username=config.admin)))
     dp.add_handler(CommandHandler('r', restart, filters=Filters.user(username=config.admin)))
