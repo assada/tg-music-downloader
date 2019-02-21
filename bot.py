@@ -9,8 +9,9 @@ import re
 import sys
 from threading import Thread
 
+import telegram
 from telegram import ChatAction
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, run_async
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, run_async, CallbackQueryHandler
 
 from src.helper import Helper
 from src.config import Config
@@ -32,12 +33,15 @@ config = Config(
 )
 downloader = Downloader(config)
 
+updates = {}
+
 
 @run_async
 def link(bot, update):
     text = str(update.message.text.encode('utf-8'))
     if _validate_link(text):
-        downloader.download_by_link(bot, update, text)
+        updates.update({text: update})
+        downloader.question(bot, update, text)
 
 
 def _validate_link(text):
@@ -72,6 +76,16 @@ def error(bot, update, e):
     logger.warning('Update "%s" caused error "%s"', update, e)
 
 
+def button(bot, update, update_queue):
+    query = update.callback_query
+    data = query.data
+    if data is not "no" and data.startswith('http'):
+        downloader.download_by_link(bot, updates[data], data)
+    query.message.delete()
+    if data in updates:
+        del updates[data]
+
+
 @run_async
 def create_playlist(bot, update):
     message = update.message.reply_text('Start updating playlist...', quote=True)
@@ -104,6 +118,7 @@ def main():
 
     dp.add_handler(CommandHandler("start", start))
     dp.add_handler(CommandHandler("help", help))
+    dp.add_handler(CallbackQueryHandler(button, True))
     dp.add_handler(CommandHandler("playlist", create_playlist, filters=Filters.user(username=config.admin)))
     dp.add_handler(CommandHandler('r', restart, filters=Filters.user(username=config.admin)))
     dp.add_handler(MessageHandler(Filters.text & Filters.user(username=config.admin), link))

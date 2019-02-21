@@ -7,6 +7,7 @@ import os
 import shutil
 
 import requests
+import telegram
 import youtube_dl
 from PIL import Image
 from mutagen.id3 import ID3, TPE1, TRCK, TALB, APIC, ID3NoHeaderError
@@ -87,9 +88,10 @@ class Tag:
 
 
 class YoutubeDownloader:
-    def __init__(self, config, path, link):
+    def __init__(self, config, path, link, download=True):
         self.path = path
         self.link = link
+        self.download = download
         self.ydl_opts = {
             'outtmpl': path + '.%(ext)s',
             'format': 'bestaudio/best',
@@ -112,8 +114,10 @@ class YoutubeDownloader:
     def __enter__(self):
         with youtube_dl.YoutubeDL(self.ydl_opts) as ydl:
             path = '%s.mp3' % self.path
+            if self.download is not False:
+                self.download = not os.path.exists(path)
 
-            return ydl.extract_info(self.link, download=not os.path.exists(path))
+            return ydl.extract_info(self.link, download=self.download)
 
     def __exit__(self, exp_type, exp_value, exp_tr):
         return None
@@ -134,10 +138,10 @@ class Downloader:
 
     @run_async
     def download_tg(self, bot, update, file_id):
-        message = update.message.reply_text('Start downloading...', quote=True)
+        message = update.message.reply_text('🔍 Start downloading...', quote=True)
         self.config.get_logger().info('Processing file: %s', file_id)
         new_file = bot.get_file(file_id)
-        message.edit_text(text='Downloading...')
+        message.edit_text(text='🧠 Downloading...')
         path = (self.config.destination + file_id + '.mp3').encode("utf-8")
         if new_file.download(path):
             fullname = self.get_fullname_by_tags(path)
@@ -148,28 +152,45 @@ class Downloader:
                 path = new_path
 
             self.config.get_logger().info('Saved to: %s', path)
-            message.edit_text(text='Saved!')
+            message.edit_text(text='🎉 Saved!')
         else:
             message.edit_text(text='Error.')
 
     @run_async
-    def download_by_link(self, bot, update, link):
-        bot.sendChatAction(chat_id=update.message.chat_id, action=ChatAction.TYPING)
-        self.config.get_logger().info('Downloading by link: %s', link)
+    def question(self, bot, update, link):
         file_name = Helper.formatting(link)
         path = './temp/%s' % file_name
-        message = update.message.reply_text('Downloading...', quote=True)
+        message = update.message.reply_text('🔍 Searching...', quote=True)
+        with YoutubeDownloader(self.config, path, link, False) as info:
+            message.delete()
+            button_list = [
+                telegram.InlineKeyboardButton("Download", callback_data=link),
+                telegram.InlineKeyboardButton("Cancel", callback_data='no')
+            ]
+            reply_markup = telegram.InlineKeyboardMarkup(Helper.build_menu(button_list, n_cols=2))
+            update.message.reply_text(
+                text='🚥 Download %s?' % info['title'],
+                reply_markup=reply_markup
+            )
+
+    @run_async
+    def download_by_link(self, bot, update, link):
+        bot.sendChatAction(chat_id=update.message.chat_id, action=ChatAction.TYPING)
+        self.config.get_logger().info('🔍 Downloading by link: %s', link)
+        file_name = Helper.formatting(link)
+        path = './temp/%s' % file_name
+        message = update.message.reply_text('🧠 Downloading...', quote=True)
         with YoutubeDownloader(self.config, path, link) as info:
             self.config.get_logger().info('Downloaded: %s', info['title'])
             path = '%s.mp3' % path
             too_big_message = None
-            message.edit_text(text='Processing...')
+            message.edit_text(text='🧠 Processing...')
             self.config.get_logger().info('Processing %s...', info['title'])
 
             with Tag(path, info) as tags:
                 file_size = os.path.getsize(path) / (1024 * 1024)
                 if not file_size > 50:
-                    message.edit_text(text="Sending (%sMB)" % file_size)
+                    message.edit_text(text="🚀 Sending (%sMB)" % file_size)
                     bot.sendChatAction(chat_id=update.message.chat_id, action=ChatAction.UPLOAD_AUDIO)
                     with Thumb(tags['cover']) as thumb:
                         bot.sendAudio(
@@ -191,9 +212,9 @@ class Downloader:
                 if self.config.persist:
                     new_path = '%s%s.mp3' % (self.config.destination, tags['full_title'].encode("utf-8"))
                     self.config.get_logger().info('Moving to: %s', new_path)
-                    message.edit_text(text="Moving... (%sMB)" % file_size)
+                    message.edit_text(text="💾 Moving... (%sMB)" % file_size)
                     shutil.move(path, new_path)
-                    message.edit_text(text="Saved.")
+                    message.edit_text(text="🎉 Saved.")
                 else:
                     os.remove(path)
                     message.delete()

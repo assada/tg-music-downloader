@@ -8,7 +8,9 @@ class Config:
         self.destination = destination
         if not self.destination.endswith('/'):
             self.destination = destination + '/'
-        self.admin = '@' + admin
+        if ',' in admin:
+            admin = admin.split(',')
+        self.admin = admin
         self.token = token
         self._logger = logger
         self.persist = persist
@@ -27,7 +29,7 @@ class Config:
     def validate(self):
         if (self.token is not None and self.admin is not None and self.destination is not None) \
                 and len(self.token) == 45 \
-                and (isinstance(self.admin, str) or isinstance(self.admin, unicode)) \
+                and (isinstance(self.admin, str) or isinstance(self.admin, unicode) or isinstance(self.admin, list)) \
                 and os.path.exists(self.destination):
             return True
         return False
