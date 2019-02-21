@@ -28,7 +28,7 @@ docker run --rm -v $(pwd)/files:/tg-music-downloader/files -e BOT_TOKEN='<tg_bot
 
 ### License
 
-The OctoberCMS platform is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+This is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
 
 ### Contributing
 
