@@ -2,6 +2,13 @@
 
 This bot wil download audio files which you are send to him.
 
+<p align="center">
+    <a href="https://i.imgur.com/VcxQma7.png">
+    	<img src="https://i.imgur.com/VcxQma7.png" alt="Awesome-Design-Tools"/>
+    </a>
+</p>
+
+
 ### Requirements
 * python 2.7
 * ffmpeg
