@@ -1,6 +1,6 @@
 # Telegram downloader bot
 
-This bot wil download audio files which you are send to him.
+This bot wil download audio files which you are sending to him. Working with youtube, soundcloud and direct files.
 
 <p align="center">
     <a href="https://i.imgur.com/VcxQma7.png">
